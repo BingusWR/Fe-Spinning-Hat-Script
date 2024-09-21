@@ -90,6 +90,8 @@ player.CharacterAdded:Connect(function(newCharacter)
     end
 end)
 
+-- (Your existing code...)
+
 local function handleChatMessage(message, player)
     local messageSender = message.TextSource.UserId
     
@@ -124,10 +126,10 @@ local function handleChatMessage(message, player)
                 local foundPlayer = findPlayerByName(partialName)
                 if foundPlayer then
                     targetPlayer = foundPlayer
-                    isResettingManually.Value = true -- Set to true to enable continuous resetting
+                    isResettingManually.Value = true
                     print("Target player set to " .. foundPlayer.Name)
-                    spinAccessoriesAroundPlayer(targetPlayer) -- Start spinning with the current speed
-                    viewPlayer(targetPlayer) -- Start viewing the target player
+                    spinAccessoriesAroundPlayer(targetPlayer)
+                    viewPlayer(targetPlayer)
                 else
                     print("No player found with name part: " .. partialName)
                 end
@@ -139,10 +141,24 @@ local function handleChatMessage(message, player)
             if partialName then
                 local foundPlayer = findPlayerByName(partialName)
                 if foundPlayer then
-                    viewPlayer(foundPlayer) -- Start viewing the target player
+                    viewPlayer(foundPlayer)
                 else
                     print("No player found with name part: " .. partialName)
                 end
+            end
+        end
+        
+        -- Add the stop command
+        if string.sub(message.Text, 1, 5) == ";stop" then
+            targetPlayer = nil
+            isResettingManually.Value = false
+            if spinningConnection then
+                spinningConnection:Disconnect() -- Stop spinning effect
+                spinningConnection = nil
+            end
+            print("Stopped all actions and reset.")
+            if character and character:FindFirstChild("Humanoid") then
+                character.Humanoid.Health = character.Humanoid.MaxHealth -- Reset health
             end
         end
     end
@@ -152,7 +168,7 @@ local function handleChatMessage(message, player)
         if partialName then
             local foundPlayer = findPlayerByName(partialName)
             if foundPlayer then
-                commandAccess[foundPlayer.UserId] = true -- Grant this player access to hat commands
+                commandAccess[foundPlayer.UserId] = true
                 print("Gave command access to " .. foundPlayer.Name)
                 local privateMessage = "/w " .. foundPlayer.Name .. " Here are the commands you can use: ;speed [number] ;ra [radius] ;a [angle]"
                 game:GetService("Chat"):Chat(player.Character.Head, privateMessage, Enum.ChatColor.Red)
