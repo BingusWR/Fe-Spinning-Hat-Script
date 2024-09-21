@@ -1,4 +1,4 @@
-local Players = game:GetService("Players")
+local Players = game:GetService("Players") 
 local RunService = game:GetService("RunService")
 local TextChatService = game:GetService("TextChatService")
 local player = Players.LocalPlayer
@@ -14,8 +14,8 @@ local radius = 5
 local angle = 0
 local spinningConnection -- This will hold the connection for the spinning effect
 local commandAccess = {} -- Table to store players with access to hat commands
+local viewingPlayer -- This will store the player being viewed
 
--- Function to find a player by part of their username or display name
 local function findPlayerByName(partialName)
     partialName = string.lower(partialName)
     for _, otherPlayer in pairs(Players:GetPlayers()) do
@@ -26,7 +26,6 @@ local function findPlayerByName(partialName)
     return nil -- Return nil if no player found
 end
 
--- Function to make accessories spin around the target player
 local function spinAccessoriesAroundPlayer(targetPlayer)
     if spinningConnection then
         spinningConnection:Disconnect() -- Stop previous spinning effect
@@ -34,14 +33,12 @@ local function spinAccessoriesAroundPlayer(targetPlayer)
 
     local accessories = {}
 
-    -- Collect all hats and hairs (accessories)
     for _, accessory in ipairs(character:GetChildren()) do
         if accessory:IsA("Accessory") then
             table.insert(accessories, accessory)
         end
     end
 
-    -- Set up the spinning effect
     spinningConnection = RunService.Heartbeat:Connect(function(deltaTime)
         angle = angle + (spinSpeed * deltaTime)
 
@@ -58,14 +55,12 @@ local function spinAccessoriesAroundPlayer(targetPlayer)
     end)
 end
 
--- Function to force the player to reset
 local function forceReset()
     if player.Character and player.Character:FindFirstChild("Humanoid") then
         player.Character.Humanoid:TakeDamage(player.Character.Humanoid.MaxHealth)
     end
 end
 
--- Function to initialize and start the reset loop
 local function startResetLoop()
     while true do
         if isResettingManually.Value then
@@ -75,31 +70,38 @@ local function startResetLoop()
     end
 end
 
--- Event listener for when the player dies (resets)
+local function viewPlayer(targetPlayer)
+    local camera = workspace.CurrentCamera
+    if targetPlayer and targetPlayer.Character and targetPlayer.Character:FindFirstChild("HumanoidRootPart") then
+        viewingPlayer = targetPlayer
+        camera.CameraSubject = targetPlayer.Character.Humanoid -- Set the camera to follow the target player's Humanoid
+        print("Now viewing: " .. targetPlayer.Name)
+    end
+end
+
 player.CharacterAdded:Connect(function(newCharacter)
     character = newCharacter
     wait(1)
     if targetPlayer then
-        spinAccessoriesAroundPlayer(targetPlayer) -- Spin accessories with the last set speed
+        spinAccessoriesAroundPlayer(targetPlayer)
+        if isResettingManually.Value then
+            viewPlayer(targetPlayer) -- Continue viewing the target player after reset
+        end
     end
 end)
 
--- Function to handle chat messages
 local function handleChatMessage(message, player)
     local messageSender = message.TextSource.UserId
     
-    -- Check if the player has permission to use commands (including the LocalPlayer)
     if messageSender == player.UserId or commandAccess[messageSender] then
-        -- Check for ";speed" command
         if string.sub(message.Text, 1, 6) == ";speed" then
             local newSpeed = tonumber(string.sub(message.Text, 8))
             if newSpeed then
-                spinSpeed = newSpeed -- Update spinSpeed with the new value
+                spinSpeed = newSpeed
                 print("Spin speed set to " .. newSpeed)
             end
         end
 
-        -- Check for ";ra" (radius) command
         if string.sub(message.Text, 1, 3) == ";ra" then
             local newRadius = tonumber(string.sub(message.Text, 5))
             if newRadius then
@@ -108,7 +110,6 @@ local function handleChatMessage(message, player)
             end
         end
 
-        -- Check for ";a" (angle) command
         if string.sub(message.Text, 1, 2) == ";a" then
             local newAngle = tonumber(string.sub(message.Text, 4))
             if newAngle then
@@ -117,7 +118,6 @@ local function handleChatMessage(message, player)
             end
         end
 
-        -- Check for ";h" command (find player by partial name)
         if string.sub(message.Text, 1, 2) == ";h" then
             local partialName = string.sub(message.Text, 4)
             if partialName then
@@ -127,20 +127,26 @@ local function handleChatMessage(message, player)
                     isResettingManually.Value = true -- Set to true to enable continuous resetting
                     print("Target player set to " .. foundPlayer.Name)
                     spinAccessoriesAroundPlayer(targetPlayer) -- Start spinning with the current speed
+                    viewPlayer(targetPlayer) -- Start viewing the target player
                 else
                     print("No player found with name part: " .. partialName)
                 end
             end
         end
 
-        -- Check for ";stop" command
-        if string.sub(message.Text, 1, 5) == ";stop" then
-            isResettingManually.Value = false -- Stop continuous resetting
-            print("Resetting stopped.")
+        if string.sub(message.Text, 1, 5) == ";view" then
+            local partialName = string.sub(message.Text, 7)
+            if partialName then
+                local foundPlayer = findPlayerByName(partialName)
+                if foundPlayer then
+                    viewPlayer(foundPlayer) -- Start viewing the target player
+                else
+                    print("No player found with name part: " .. partialName)
+                end
+            end
         end
     end
 
-    -- Check for ";givecmd" command (grant control to another player)
     if string.sub(message.Text, 1, 8) == ";givecmd" then
         local partialName = string.sub(message.Text, 10)
         if partialName then
@@ -148,10 +154,7 @@ local function handleChatMessage(message, player)
             if foundPlayer then
                 commandAccess[foundPlayer.UserId] = true -- Grant this player access to hat commands
                 print("Gave command access to " .. foundPlayer.Name)
-                
-                -- Send private chat message with the commands
                 local privateMessage = "/w " .. foundPlayer.Name .. " Here are the commands you can use: ;speed [number] ;ra [radius] ;a [angle]"
-                -- Simulate sending a private message by adding it to the chat
                 game:GetService("Chat"):Chat(player.Character.Head, privateMessage, Enum.ChatColor.Red)
             else
                 print("No player found with name part: " .. partialName)
@@ -160,12 +163,10 @@ local function handleChatMessage(message, player)
     end
 end
 
--- Connect to the new TextChatService
 TextChatService.OnIncomingMessage = function(message)
     if message.TextSource and message.TextSource.UserId then
         handleChatMessage(message, player)
     end
 end
 
--- Start the reset loop in a separate coroutine
 coroutine.wrap(startResetLoop)()
